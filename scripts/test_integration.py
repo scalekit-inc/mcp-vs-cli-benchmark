@@ -59,6 +59,29 @@ LOCAL_TEST_TASK = TaskDefinition(
 
 async def run_cli_test(model: str) -> RunResult:
     """Run one CLI agent task with a real LLM call."""
+    console.print(f"  [dim]Creating CLI agent with model: {model}[/dim]")
+
+    # Quick connectivity check first
+    console.print("  [dim]Testing API connectivity...[/dim]")
+    import litellm
+    litellm.suppress_debug_info = True
+    try:
+        test_resp = litellm.completion(
+            model=model,
+            messages=[{"role": "user", "content": "Reply with just the word 'ok'"}],
+            max_tokens=10,
+            temperature=0,
+        )
+        console.print(
+            f"  [green]API connected[/green] — "
+            f"got: {test_resp.choices[0].message.content!r} "
+            f"({test_resp.usage.prompt_tokens}+{test_resp.usage.completion_tokens} tokens)"
+        )
+    except Exception as e:
+        console.print(f"  [red]API connectivity failed: {e}[/red]")
+        raise
+
+    console.print("  [dim]Starting agent run (tool calling)...[/dim]")
     agent = CliAgent(model=model)
     result = await agent.run(
         task=LOCAL_TEST_TASK,
@@ -66,6 +89,7 @@ async def run_cli_test(model: str) -> RunResult:
         modality="cli",
         is_cold_start=True,
     )
+    console.print(f"  [dim]Agent run complete — {result.tool_call_count} tool calls, {result.total_tokens} tokens[/dim]")
     return result
 
 
