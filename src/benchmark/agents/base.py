@@ -1,8 +1,9 @@
+import json
 import time
 from pathlib import Path
 from typing import Any
 
-import anthropic
+import litellm
 
 from benchmark.metrics.collector import MetricsCollector
 from benchmark.metrics.schemas import RunResult
@@ -10,9 +11,33 @@ from benchmark.tasks.schema import TaskDefinition
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "prompts" / "system.md"
 
+# Suppress litellm's verbose logging by default
+litellm.suppress_debug_info = True
+
+
+def _to_openai_tool(tool: dict[str, Any]) -> dict[str, Any]:
+    """Convert Anthropic-style tool def to OpenAI-style function calling format.
+
+    Anthropic: {"name", "description", "input_schema"}
+    OpenAI:    {"type": "function", "function": {"name", "description", "parameters"}}
+    """
+    return {
+        "type": "function",
+        "function": {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "parameters": tool.get("input_schema", tool.get("parameters", {})),
+        },
+    }
+
 
 class BaseAgent:
-    """Wraps the Claude API for benchmark runs. Subclass for CLI/MCP specifics."""
+    """Wraps LiteLLM for benchmark runs. Works with any model provider.
+
+    Supports: Anthropic, OpenAI, Google Gemini, Mistral, and 100+ others via LiteLLM.
+    Set the model string accordingly (e.g., "anthropic/claude-sonnet-4-20250514",
+    "gemini/gemini-2.5-pro", "openai/gpt-4o").
+    """
 
     def __init__(
         self,
@@ -21,9 +46,9 @@ class BaseAgent:
         system_prompt: str | None = None,
     ) -> None:
         self.model = model
-        self.tools = tools
+        self.tools = tools  # Anthropic format (for backward compat / MCP agent)
+        self._openai_tools = [_to_openai_tool(t) for t in tools] if tools else []
         self.system_prompt = system_prompt or self._load_system_prompt()
-        self.client = anthropic.Anthropic()
 
     def _load_system_prompt(self) -> str:
         if SYSTEM_PROMPT_PATH.exists():
@@ -44,9 +69,12 @@ class BaseAgent:
         modality: str,
         is_cold_start: bool = False,
     ) -> RunResult:
-        """Run a single benchmark: send task to Claude, handle tool calls, collect metrics."""
+        """Run a single benchmark: send task to LLM, handle tool calls, collect metrics."""
         collector = MetricsCollector(run_id=run_id, task_id=task.id, modality=modality)
-        messages = self.build_messages(task)
+        messages: list[dict[str, Any]] = [
+            {"role": "system", "content": self.system_prompt},
+            *self.build_messages(task),
+        ]
 
         max_turns = 20
         final_text = ""
@@ -54,71 +82,78 @@ class BaseAgent:
 
         try:
             for _ in range(max_turns):
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=4096,
-                    temperature=0,
-                    system=self.system_prompt,
-                    tools=self.tools,
-                    messages=messages,
-                )
+                kwargs: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": 0,
+                    "max_tokens": 4096,
+                }
+                if self._openai_tools:
+                    kwargs["tools"] = self._openai_tools
 
+                response = litellm.completion(**kwargs)
+
+                usage = response.usage
                 collector.record_api_response(
-                    input_tokens=response.usage.input_tokens,
-                    output_tokens=response.usage.output_tokens,
+                    input_tokens=usage.prompt_tokens or 0,
+                    output_tokens=usage.completion_tokens or 0,
                 )
 
-                tool_use_blocks = []
-                for block in response.content:
-                    if block.type == "text":
-                        final_text += block.text
-                    elif block.type == "tool_use":
-                        tool_use_blocks.append(block)
+                choice = response.choices[0]
+                msg = choice.message
 
-                if not tool_use_blocks:
+                if msg.content:
+                    final_text += msg.content
+
+                tool_calls = msg.tool_calls
+                if not tool_calls:
                     break
 
-                messages.append({"role": "assistant", "content": response.content})
+                # Add assistant message to history
+                messages.append(msg.model_dump())
 
-                tool_results = []
-                for tool_block in tool_use_blocks:
+                # Execute each tool call
+                for tc in tool_calls:
+                    func = tc.function
+                    tool_name = func.name
+                    tool_input = (
+                        json.loads(func.arguments)
+                        if isinstance(func.arguments, str)
+                        else func.arguments
+                    )
+
                     start = time.monotonic()
                     try:
-                        result = await self.execute_tool(
-                            tool_block.name, tool_block.input
-                        )
+                        result = await self.execute_tool(tool_name, tool_input)
                         duration_ms = (time.monotonic() - start) * 1000
                         collector.record_tool_call(
-                            tool_name=tool_block.name,
-                            tool_input=tool_block.input,
+                            tool_name=tool_name,
+                            tool_input=tool_input,
                             tool_output=result,
                             duration_ms=duration_ms,
                             success=True,
                         )
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_block.id,
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
                             "content": result,
                         })
                     except Exception as e:
                         duration_ms = (time.monotonic() - start) * 1000
                         error_str = str(e)
                         collector.record_tool_call(
-                            tool_name=tool_block.name,
-                            tool_input=tool_block.input,
+                            tool_name=tool_name,
+                            tool_input=tool_input,
                             tool_output="",
                             duration_ms=duration_ms,
                             success=False,
                             error=error_str,
                         )
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_block.id,
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tc.id,
                             "content": f"Error: {error_str}",
-                            "is_error": True,
                         })
-
-                messages.append({"role": "user", "content": tool_results})
 
         except Exception as e:
             error = str(e)

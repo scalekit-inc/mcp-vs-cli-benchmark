@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Rigorous benchmark comparing MCP servers vs CLI tools for AI agents"
 requires-python = ">=3.12"
 dependencies = [
-    "anthropic>=0.42.0",
+    "litellm>=1.55",
     "pydantic>=2.0",
     "pyyaml>=6.0",
     "scipy>=1.14",

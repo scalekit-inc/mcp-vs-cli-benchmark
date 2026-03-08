@@ -1,4 +1,4 @@
-"""Smoke test: full pipeline with mocked Claude API."""
+"""Smoke test: full pipeline with mocked LiteLLM."""
 import json
 from unittest.mock import MagicMock, patch
 
@@ -26,33 +26,42 @@ async def test_full_pipeline_smoke():
         ),
     )
 
-    # 2. Mock Claude API — first response has tool_use, second has text
-    mock_tool_block = MagicMock()
-    mock_tool_block.type = "tool_use"
-    mock_tool_block.name = "bash"
-    mock_tool_block.input = {"command": "echo '[{\"number\": 1, \"title\": \"Test\"}]'"}
-    mock_tool_block.id = "tool_1"
+    # 2. Mock LiteLLM — first response has tool_calls, second has text only
+    mock_tool_call = MagicMock()
+    mock_tool_call.id = "call_1"
+    mock_tool_call.function.name = "bash"
+    mock_tool_call.function.arguments = json.dumps(
+        {"command": "echo '[{\"number\": 1, \"title\": \"Test\"}]'"}
+    )
 
-    mock_text_block = MagicMock()
-    mock_text_block.type = "text"
-    mock_text_block.text = '[{"number": 1, "title": "Test"}]'
+    mock_msg_1 = MagicMock()
+    mock_msg_1.content = None
+    mock_msg_1.tool_calls = [mock_tool_call]
+    mock_msg_1.model_dump.return_value = {
+        "role": "assistant",
+        "content": None,
+        "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "bash", "arguments": "{}"}}],
+    }
+
+    mock_msg_2 = MagicMock()
+    mock_msg_2.content = '[{"number": 1, "title": "Test"}]'
+    mock_msg_2.tool_calls = None
 
     mock_response_1 = MagicMock()
-    mock_response_1.content = [mock_tool_block]
-    mock_response_1.usage = MagicMock(input_tokens=100, output_tokens=50)
+    mock_response_1.choices = [MagicMock(message=mock_msg_1)]
+    mock_response_1.usage = MagicMock(prompt_tokens=100, completion_tokens=50)
 
     mock_response_2 = MagicMock()
-    mock_response_2.content = [mock_text_block]
-    mock_response_2.usage = MagicMock(input_tokens=150, output_tokens=30)
+    mock_response_2.choices = [MagicMock(message=mock_msg_2)]
+    mock_response_2.usage = MagicMock(prompt_tokens=150, completion_tokens=30)
 
-    with patch("benchmark.agents.base.anthropic") as mock_anthropic:
-        mock_client = MagicMock()
-        mock_client.messages.create = MagicMock(
+    with patch("benchmark.agents.base.litellm") as mock_litellm:
+        mock_litellm.completion = MagicMock(
             side_effect=[mock_response_1, mock_response_2]
         )
-        mock_anthropic.Anthropic.return_value = mock_client
+        mock_litellm.suppress_debug_info = True
 
-        agent = CliAgent(model="claude-sonnet-4-20250514")
+        agent = CliAgent(model="anthropic/claude-sonnet-4-20250514")
         result = await agent.run(
             task=task,
             run_id="smoke-test-001",

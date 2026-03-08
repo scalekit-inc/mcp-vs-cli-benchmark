@@ -8,7 +8,7 @@ import json
 import random
 from typing import Any
 
-import anthropic
+import litellm
 
 from benchmark.metrics.schemas import JudgeVerdict
 
@@ -92,7 +92,6 @@ async def judge_outputs(
     Returns:
         Tuple of (cli_verdicts, mcp_verdicts).
     """
-    client = anthropic.Anthropic()
     cli_verdicts: list[JudgeVerdict] = []
     mcp_verdicts: list[JudgeVerdict] = []
 
@@ -105,15 +104,17 @@ async def judge_outputs(
 
         prompt = build_judge_prompt(task_description, output_a, output_b)
 
-        response = client.messages.create(
+        response = litellm.completion(
             model=judge_model,
+            messages=[
+                {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
             max_tokens=1024,
             temperature=0,
-            system=JUDGE_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": prompt}],
         )
 
-        text = response.content[0].text if response.content else ""
+        text = response.choices[0].message.content or ""
         scores = parse_judge_response(text)
 
         if scores is None:

@@ -23,8 +23,8 @@ DEFAULT_TASK_IDS: dict[str, list[str]] = {
 class BenchmarkConfig(BaseModel):
     """Configuration for a benchmark run suite."""
     runs_per_modality: int = 30
-    model: str = "claude-sonnet-4-20250514"
-    judge_model: str = "claude-opus-4-20250514"
+    model: str = "anthropic/claude-sonnet-4-20250514"
+    judge_model: str = "anthropic/claude-opus-4-20250514"
     services: list[str] = ["github"]
     cold_start_runs: int = 3
     seed: int | None = None
