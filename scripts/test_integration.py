@@ -71,6 +71,7 @@ async def run_cli_test(model: str) -> RunResult:
             messages=[{"role": "user", "content": "Reply with just the word 'ok'"}],
             max_tokens=10,
             temperature=0,
+            timeout=15,
         )
         console.print(
             f"  [green]API connected[/green] — "
@@ -81,14 +82,18 @@ async def run_cli_test(model: str) -> RunResult:
         console.print(f"  [red]API connectivity failed: {e}[/red]")
         raise
 
-    console.print("  [dim]Starting agent run (tool calling)...[/dim]")
-    agent = CliAgent(model=model)
-    result = await agent.run(
-        task=LOCAL_TEST_TASK,
-        run_id="integration-cli-001",
-        modality="cli",
-        is_cold_start=True,
+    console.print(
+        "  [dim]Starting agent run with tool calling... "
+        "(thinking models like gemini-2.5-flash may take 15-30s per turn)[/dim]"
     )
+    agent = CliAgent(model=model)
+    with console.status("[bold cyan]Agent thinking..."):
+        result = await agent.run(
+            task=LOCAL_TEST_TASK,
+            run_id="integration-cli-001",
+            modality="cli",
+            is_cold_start=True,
+        )
     console.print(f"  [dim]Agent run complete — {result.tool_call_count} tool calls, {result.total_tokens} tokens[/dim]")
     return result
 
