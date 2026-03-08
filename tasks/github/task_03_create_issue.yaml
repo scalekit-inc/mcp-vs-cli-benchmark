@@ -1,0 +1,22 @@
+id: github_03
+service: github
+name: Create an issue with title body and labels
+complexity: simple_write
+prompt: |
+  Create a new issue in the repository {repo} with the following details:
+  - Title: "Benchmark test issue {run_id}"
+  - Body: "This is an automated test issue created by the MCP vs CLI benchmark."
+  - Labels: ["bug", "enhancement"]
+
+  After creating the issue, return a JSON object with:
+  - "number": the issue number that was created
+  - "title": the title
+  - "url": the HTML URL of the issue
+
+  Return ONLY the JSON object, no other text.
+prompt_vars:
+  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
+  run_id: "PLACEHOLDER"
+verification:
+  type: api_check
+  check_endpoint: "/repos/{repo}/issues/{number}"

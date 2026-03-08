@@ -1,0 +1,21 @@
+id: github_04
+service: github
+name: Find and summarize merged PRs by user
+complexity: complex_read
+prompt: |
+  In the repository {repo}, find all pull requests authored by "alice"
+  that have been merged. For each merged PR, provide:
+  - The PR number
+  - The PR title
+  - A one-sentence summary of what the PR does (based on its title and review comments)
+
+  Return a JSON array of objects with "number", "title", and "summary" fields.
+  Return ONLY the JSON array, no other text.
+prompt_vars:
+  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
+verification:
+  type: llm_judge
+  judge_prompt: |
+    The agent was asked to find all merged PRs by "alice" and summarize them.
+    Ground truth: Alice has 1 merged PR: #11 "Fix login validation".
+    Evaluate if the agent found the correct PRs and provided reasonable summaries.

@@ -1,0 +1,30 @@
+id: github_02
+service: github
+name: Get PR details including review comments
+complexity: multi_step_read
+prompt: |
+  Get the details of pull request #12 in the repository {repo}.
+  Return a JSON object with these fields:
+  - "number": the PR number
+  - "title": the PR title
+  - "state": "open" or "merged"
+  - "author": the PR author's username
+  - "reviews": an array of objects with "user", "body", and "state" fields
+
+  Return ONLY the JSON object, no other text.
+prompt_vars:
+  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
+verification:
+  type: exact_match
+  ground_truth:
+    number: 12
+    title: "Add dark mode CSS variables"
+    state: "merged"
+    author: "bob"
+    reviews:
+      - user: "charlie"
+        body: "Needs contrast fix"
+        state: "CHANGES_REQUESTED"
+      - user: "charlie"
+        body: "Fixed, looks good"
+        state: "APPROVED"
