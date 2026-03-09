@@ -1,15 +1,18 @@
+import asyncio
 import json
 import time
 from pathlib import Path
 from typing import Any
 
 import litellm
+from rich.console import Console
 
 from benchmark.metrics.collector import MetricsCollector
 from benchmark.metrics.schemas import RunResult
 from benchmark.tasks.schema import TaskDefinition
 
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "prompts" / "system.md"
+console = Console()
 
 # Suppress litellm's verbose logging by default
 litellm.suppress_debug_info = True
@@ -91,7 +94,18 @@ class BaseAgent:
                 if self._openai_tools:
                     kwargs["tools"] = self._openai_tools
 
-                response = litellm.completion(**kwargs)
+                max_retries = 5
+                base_delay = 10
+                for attempt in range(max_retries + 1):
+                    try:
+                        response = litellm.completion(**kwargs)
+                        break
+                    except litellm.RateLimitError:
+                        if attempt == max_retries:
+                            raise
+                        delay = base_delay * (2 ** attempt)
+                        console.print(f"  [yellow]Rate limited, retrying in {delay}s...[/yellow]")
+                        await asyncio.sleep(delay)
 
                 usage = response.usage
                 collector.record_api_response(
