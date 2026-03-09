@@ -148,7 +148,7 @@ def _run(args: argparse.Namespace) -> None:
     console.print(f"  Services:  {config.services}")
     console.print(f"  Runs/mod:  {config.runs_per_modality}")
     console.print(f"  Task:      {args.task or 'all'}")
-    console.print(f"  Modality:  {args.modality or 'both'}")
+    console.print(f"  Modality:  {args.modality or ', '.join(config.modalities)}")
     console.print(f"  Skills:    {'enabled' if args.skills else 'disabled'}")
     console.print(f"  Scheduled: {len(schedule)} runs")
     console.print(f"  Output:    {results_dir}")

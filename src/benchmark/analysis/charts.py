@@ -12,8 +12,23 @@ from benchmark.metrics.schemas import RunResult
 # Style constants
 CLI_COLOR = "#3b82f6"
 MCP_COLOR = "#d946ef"
+GATEWAY_COLOR = "#10b981"
+CLI_SKILLED_COLOR = "#f59e0b"
 BACKGROUND_COLOR = "white"
 GRID_COLOR = "#e5e7eb"
+
+MODALITY_COLORS: dict[str, str] = {
+    "cli": CLI_COLOR,
+    "mcp": MCP_COLOR,
+    "gateway": GATEWAY_COLOR,
+    "cli_skilled": CLI_SKILLED_COLOR,
+}
+MODALITY_LABELS: dict[str, str] = {
+    "cli": "CLI",
+    "mcp": "MCP",
+    "gateway": "Gateway",
+    "cli_skilled": "CLI Skilled",
+}
 
 _LAYOUT_DEFAULTS = dict(
     plot_bgcolor=BACKGROUND_COLOR,
@@ -41,23 +56,27 @@ def _sorted_task_ids(grouped: dict[str, dict[str, list[RunResult]]]) -> list[str
     return sorted(grouped.keys())
 
 
+def _detect_modalities(results: list[RunResult]) -> list[str]:
+    """Return an ordered list of modalities present in the results."""
+    seen: set[str] = {r.modality for r in results}
+    # Maintain a consistent ordering
+    order = ["cli", "cli_skilled", "mcp", "gateway"]
+    return [m for m in order if m in seen]
+
+
 def token_comparison_chart(results: list[RunResult]) -> go.Figure:
-    """Grouped bar chart comparing median total tokens (CLI vs MCP) per task.
+    """Grouped bar chart comparing median total tokens per modality per task.
 
     Includes error bars showing the p25-p75 interquartile range.
     """
     grouped = _group_by_task_and_modality(results)
     task_ids = _sorted_task_ids(grouped)
+    modalities = _detect_modalities(results)
 
-    cli_medians, mcp_medians = [], []
-    cli_err_minus, cli_err_plus = [], []
-    mcp_err_minus, mcp_err_plus = [], []
-
-    for tid in task_ids:
-        for modality, medians, err_m, err_p in [
-            ("cli", cli_medians, cli_err_minus, cli_err_plus),
-            ("mcp", mcp_medians, mcp_err_minus, mcp_err_plus),
-        ]:
+    fig = go.Figure()
+    for modality in modalities:
+        medians, err_minus, err_plus = [], [], []
+        for tid in task_ids:
             runs = grouped[tid].get(modality, [])
             if runs:
                 vals = [r.total_tokens for r in runs]
@@ -65,28 +84,19 @@ def token_comparison_chart(results: list[RunResult]) -> go.Figure:
                 p25 = float(np.percentile(vals, 25))
                 p75 = float(np.percentile(vals, 75))
                 medians.append(med)
-                err_m.append(max(med - p25, 0))
-                err_p.append(max(p75 - med, 0))
+                err_minus.append(max(med - p25, 0))
+                err_plus.append(max(p75 - med, 0))
             else:
                 medians.append(0)
-                err_m.append(0)
-                err_p.append(0)
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="CLI",
-        x=task_ids,
-        y=cli_medians,
-        marker_color=CLI_COLOR,
-        error_y=dict(type="data", symmetric=False, array=cli_err_plus, arrayminus=cli_err_minus),
-    ))
-    fig.add_trace(go.Bar(
-        name="MCP",
-        x=task_ids,
-        y=mcp_medians,
-        marker_color=MCP_COLOR,
-        error_y=dict(type="data", symmetric=False, array=mcp_err_plus, arrayminus=mcp_err_minus),
-    ))
+                err_minus.append(0)
+                err_plus.append(0)
+        fig.add_trace(go.Bar(
+            name=MODALITY_LABELS.get(modality, modality),
+            x=task_ids,
+            y=medians,
+            marker_color=MODALITY_COLORS.get(modality, "#888888"),
+            error_y=dict(type="data", symmetric=False, array=err_plus, arrayminus=err_minus),
+        ))
     fig.update_layout(
         title="Token Usage Comparison (Median with IQR)",
         xaxis_title="Task",
@@ -98,12 +108,13 @@ def token_comparison_chart(results: list[RunResult]) -> go.Figure:
 
 
 def latency_box_plot(results: list[RunResult]) -> go.Figure:
-    """Box plot of wall_clock_seconds for CLI vs MCP, grouped by task."""
+    """Box plot of wall_clock_seconds per modality, grouped by task."""
     grouped = _group_by_task_and_modality(results)
     task_ids = _sorted_task_ids(grouped)
+    modalities = _detect_modalities(results)
 
     fig = go.Figure()
-    for modality, color, name in [("cli", CLI_COLOR, "CLI"), ("mcp", MCP_COLOR, "MCP")]:
+    for modality in modalities:
         x_vals: list[str] = []
         y_vals: list[float] = []
         for tid in task_ids:
@@ -112,10 +123,10 @@ def latency_box_plot(results: list[RunResult]) -> go.Figure:
                 x_vals.append(tid)
                 y_vals.append(r.wall_clock_seconds)
         fig.add_trace(go.Box(
-            name=name,
+            name=MODALITY_LABELS.get(modality, modality),
             x=x_vals,
             y=y_vals,
-            marker_color=color,
+            marker_color=MODALITY_COLORS.get(modality, "#888888"),
             boxmean=True,
         ))
 
@@ -130,22 +141,18 @@ def latency_box_plot(results: list[RunResult]) -> go.Figure:
 
 
 def tool_calls_chart(results: list[RunResult]) -> go.Figure:
-    """Grouped bar chart comparing median tool call counts (CLI vs MCP) per task.
+    """Grouped bar chart comparing median tool call counts per modality per task.
 
     Includes error bars showing the p25-p75 interquartile range.
     """
     grouped = _group_by_task_and_modality(results)
     task_ids = _sorted_task_ids(grouped)
+    modalities = _detect_modalities(results)
 
-    cli_medians, mcp_medians = [], []
-    cli_err_minus, cli_err_plus = [], []
-    mcp_err_minus, mcp_err_plus = [], []
-
-    for tid in task_ids:
-        for modality, medians, err_m, err_p in [
-            ("cli", cli_medians, cli_err_minus, cli_err_plus),
-            ("mcp", mcp_medians, mcp_err_minus, mcp_err_plus),
-        ]:
+    fig = go.Figure()
+    for modality in modalities:
+        medians, err_minus, err_plus = [], [], []
+        for tid in task_ids:
             runs = grouped[tid].get(modality, [])
             if runs:
                 vals = [r.tool_call_count for r in runs]
@@ -153,28 +160,19 @@ def tool_calls_chart(results: list[RunResult]) -> go.Figure:
                 p25 = float(np.percentile(vals, 25))
                 p75 = float(np.percentile(vals, 75))
                 medians.append(med)
-                err_m.append(max(med - p25, 0))
-                err_p.append(max(p75 - med, 0))
+                err_minus.append(max(med - p25, 0))
+                err_plus.append(max(p75 - med, 0))
             else:
                 medians.append(0)
-                err_m.append(0)
-                err_p.append(0)
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="CLI",
-        x=task_ids,
-        y=cli_medians,
-        marker_color=CLI_COLOR,
-        error_y=dict(type="data", symmetric=False, array=cli_err_plus, arrayminus=cli_err_minus),
-    ))
-    fig.add_trace(go.Bar(
-        name="MCP",
-        x=task_ids,
-        y=mcp_medians,
-        marker_color=MCP_COLOR,
-        error_y=dict(type="data", symmetric=False, array=mcp_err_plus, arrayminus=mcp_err_minus),
-    ))
+                err_minus.append(0)
+                err_plus.append(0)
+        fig.add_trace(go.Bar(
+            name=MODALITY_LABELS.get(modality, modality),
+            x=task_ids,
+            y=medians,
+            marker_color=MODALITY_COLORS.get(modality, "#888888"),
+            error_y=dict(type="data", symmetric=False, array=err_plus, arrayminus=err_minus),
+        ))
     fig.update_layout(
         title="Tool Call Count Comparison (Median with IQR)",
         xaxis_title="Task",
@@ -189,30 +187,24 @@ def completion_rate_chart(results: list[RunResult]) -> go.Figure:
     """Grouped bar chart showing completion rates (%) per task per modality."""
     grouped = _group_by_task_and_modality(results)
     task_ids = _sorted_task_ids(grouped)
+    modalities = _detect_modalities(results)
 
-    cli_rates, mcp_rates = [], []
-    for tid in task_ids:
-        for modality, rates in [("cli", cli_rates), ("mcp", mcp_rates)]:
+    fig = go.Figure()
+    for modality in modalities:
+        rates = []
+        for tid in task_ids:
             runs = grouped[tid].get(modality, [])
             if runs:
                 rate = sum(1 for r in runs if r.task_completed) / len(runs) * 100
                 rates.append(rate)
             else:
                 rates.append(0)
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        name="CLI",
-        x=task_ids,
-        y=cli_rates,
-        marker_color=CLI_COLOR,
-    ))
-    fig.add_trace(go.Bar(
-        name="MCP",
-        x=task_ids,
-        y=mcp_rates,
-        marker_color=MCP_COLOR,
-    ))
+        fig.add_trace(go.Bar(
+            name=MODALITY_LABELS.get(modality, modality),
+            x=task_ids,
+            y=rates,
+            marker_color=MODALITY_COLORS.get(modality, "#888888"),
+        ))
     fig.update_layout(
         title="Task Completion Rate",
         xaxis_title="Task",
@@ -257,6 +249,7 @@ def generate_summary_dashboard(results: list[RunResult], output_dir: Path) -> Pa
 
     grouped = _group_by_task_and_modality(results)
     task_ids = _sorted_task_ids(grouped)
+    modalities = _detect_modalities(results)
 
     fig = make_subplots(
         rows=2,
@@ -272,18 +265,22 @@ def generate_summary_dashboard(results: list[RunResult], output_dir: Path) -> Pa
     )
 
     # --- Token comparison (row=1, col=1) ---
-    for modality, color, name in [("cli", CLI_COLOR, "CLI"), ("mcp", MCP_COLOR, "MCP")]:
+    for i, modality in enumerate(modalities):
+        color = MODALITY_COLORS.get(modality, "#888888")
+        name = MODALITY_LABELS.get(modality, modality)
         medians = []
         for tid in task_ids:
             runs = grouped[tid].get(modality, [])
             medians.append(float(np.median([r.total_tokens for r in runs])) if runs else 0)
         fig.add_trace(
-            go.Bar(name=name, x=task_ids, y=medians, marker_color=color, showlegend=True),
+            go.Bar(name=name, x=task_ids, y=medians, marker_color=color, showlegend=(i < len(modalities))),
             row=1, col=1,
         )
 
     # --- Latency box plot (row=1, col=2) ---
-    for modality, color, name in [("cli", CLI_COLOR, "CLI"), ("mcp", MCP_COLOR, "MCP")]:
+    for modality in modalities:
+        color = MODALITY_COLORS.get(modality, "#888888")
+        name = MODALITY_LABELS.get(modality, modality)
         x_vals, y_vals = [], []
         for tid in task_ids:
             for r in grouped[tid].get(modality, []):
@@ -295,7 +292,9 @@ def generate_summary_dashboard(results: list[RunResult], output_dir: Path) -> Pa
         )
 
     # --- Tool calls (row=2, col=1) ---
-    for modality, color, name in [("cli", CLI_COLOR, "CLI"), ("mcp", MCP_COLOR, "MCP")]:
+    for modality in modalities:
+        color = MODALITY_COLORS.get(modality, "#888888")
+        name = MODALITY_LABELS.get(modality, modality)
         medians = []
         for tid in task_ids:
             runs = grouped[tid].get(modality, [])
@@ -306,7 +305,9 @@ def generate_summary_dashboard(results: list[RunResult], output_dir: Path) -> Pa
         )
 
     # --- Completion rate (row=2, col=2) ---
-    for modality, color, name in [("cli", CLI_COLOR, "CLI"), ("mcp", MCP_COLOR, "MCP")]:
+    for modality in modalities:
+        color = MODALITY_COLORS.get(modality, "#888888")
+        name = MODALITY_LABELS.get(modality, modality)
         rates = []
         for tid in task_ids:
             runs = grouped[tid].get(modality, [])

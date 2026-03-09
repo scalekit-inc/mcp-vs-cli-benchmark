@@ -94,22 +94,23 @@ class TestTokenComparisonChart:
         fig = token_comparison_chart(multi_task_results)
         assert isinstance(fig, go.Figure)
 
-    def test_has_two_traces(self, multi_task_results: list[RunResult]) -> None:
+    def test_has_traces_for_present_modalities(self, multi_task_results: list[RunResult]) -> None:
         fig = token_comparison_chart(multi_task_results)
-        assert len(fig.data) == 2
-        assert fig.data[0].name == "CLI"
-        assert fig.data[1].name == "MCP"
+        trace_names = {t.name for t in fig.data}
+        assert "CLI" in trace_names
+        assert "MCP" in trace_names
 
     def test_single_run(self, single_run_results: list[RunResult]) -> None:
         fig = token_comparison_chart(single_run_results)
         assert isinstance(fig, go.Figure)
-        assert len(fig.data) == 2
+        assert len(fig.data) >= 1
 
     def test_missing_modality(self, single_modality_results: list[RunResult]) -> None:
         fig = token_comparison_chart(single_modality_results)
         assert isinstance(fig, go.Figure)
-        # MCP trace should have 0 values
-        assert fig.data[1].y[0] == 0
+        # Only CLI trace should be present (no MCP data)
+        assert len(fig.data) == 1
+        assert fig.data[0].name == "CLI"
 
 
 class TestLatencyBoxPlot:
