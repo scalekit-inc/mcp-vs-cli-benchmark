@@ -1,30 +1,22 @@
 id: github_02
 service: github
-name: Get PR details including review comments
+name: Get PR details including review status
 complexity: multi_step_read
 prompt: |
-  Get the details of pull request #12 in the repository {repo}.
+  Get the details of pull request #1158 in the repository anthropics/anthropic-sdk-python.
   Return a JSON object with these fields:
   - "number": the PR number
   - "title": the PR title
-  - "state": "open" or "merged"
-  - "author": the PR author's username
-  - "reviews": an array of objects with "user", "body", and "state" fields
+  - "state": whether the PR is open, closed, or merged (use lowercase)
+  - "author": the PR author's GitHub username
+  - "reviewer": the username of the person who approved the PR
 
   Return ONLY the JSON object, no other text.
-prompt_vars:
-  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
 verification:
-  type: exact_match
+  type: contains
   ground_truth:
-    number: 12
-    title: "Add dark mode CSS variables"
-    state: "merged"
-    author: "bob"
-    reviews:
-      - user: "charlie"
-        body: "Needs contrast fix"
-        state: "CHANGES_REQUESTED"
-      - user: "charlie"
-        body: "Fixed, looks good"
-        state: "APPROVED"
+    - "1158"
+    - "structured output"
+    - "merged"
+    - "karpetrosyan"
+    - "RobertCraigie"

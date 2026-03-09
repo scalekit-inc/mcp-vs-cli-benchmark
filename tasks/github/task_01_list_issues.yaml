@@ -1,23 +1,14 @@
 id: github_01
 service: github
-name: List open issues with label bug
+name: List open issues mentioning a keyword
 complexity: simple_read
 prompt: |
-  List all open issues in the repository {repo} that have the label "bug".
-  Return a JSON array of objects with "number" and "title" fields, sorted by
-  issue number ascending. Return ONLY the JSON array, no other text.
-prompt_vars:
-  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
+  List open issues in the repository anthropics/anthropic-sdk-python that mention
+  "streaming" in the title. Return a JSON array of objects with "number" and "title"
+  fields, sorted by issue number descending. Return ONLY the JSON array, no other text.
 verification:
-  type: exact_match
+  type: contains
   ground_truth:
-    - number: 1
-      title: "Login page returns 500 on invalid email format"
-    - number: 3
-      title: "CSS layout breaks on viewport < 768px"
-    - number: 5
-      title: "Memory leak in WebSocket reconnection handler"
-    - number: 7
-      title: "Race condition in concurrent file upload"
-    - number: 9
-      title: "API rate limiter counts preflight requests"
+    - "streaming"
+    - "number"
+    - "title"

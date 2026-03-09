@@ -1,25 +1,24 @@
 id: github_05
 service: github
-name: Create branch commit file and open PR
-complexity: multi_step_write
+name: Find latest release and list key dependencies
+complexity: multi_step_read
 prompt: |
-  In the repository {repo}, perform these steps:
-  1. Create a new branch named "bench/{run_id}/test-feature" from the main branch
-  2. Create a file called "benchmark-test.md" with the content "# Benchmark Test\nCreated by run {run_id}"
-  3. Commit the file to the new branch
-  4. Open a pull request from "bench/{run_id}/test-feature" to "main" with:
-     - Title: "Benchmark test PR {run_id}"
-     - Body: "Automated PR from benchmark run."
+  For the repository anthropics/anthropic-sdk-python, perform these steps:
+  1. Find the latest release version tag
+  2. Read the pyproject.toml file to extract the project dependencies
+  3. Identify the core runtime dependencies (not dev/test dependencies)
 
-  After completing all steps, return a JSON object with:
-  - "branch": the branch name
-  - "pr_number": the PR number
-  - "pr_url": the HTML URL of the PR
+  Return a JSON object with:
+  - "latest_release": the version tag (e.g. "v0.84.0")
+  - "package_name": the package name from pyproject.toml
+  - "dependencies": an array of the core dependency package names (just the names, not version constraints)
 
   Return ONLY the JSON object, no other text.
-prompt_vars:
-  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
-  run_id: "PLACEHOLDER"
 verification:
-  type: api_check
-  check_endpoint: "/repos/{repo}/pulls/{pr_number}"
+  type: contains
+  ground_truth:
+    - "anthropic"
+    - "httpx"
+    - "pydantic"
+    - "anyio"
+    - "jiter"

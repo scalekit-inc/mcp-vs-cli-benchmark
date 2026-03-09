@@ -1,22 +1,20 @@
 id: github_03
 service: github
-name: Create an issue with title body and labels
-complexity: simple_write
+name: Get repository metadata and installation instructions
+complexity: simple_read
 prompt: |
-  Create a new issue in the repository {repo} with the following details:
-  - Title: "Benchmark test issue {run_id}"
-  - Body: "This is an automated test issue created by the MCP vs CLI benchmark."
-  - Labels: ["bug", "enhancement"]
+  Look at the repository anthropics/anthropic-sdk-python and answer these questions:
+  1. What license does the project use?
+  2. What is the primary programming language?
+  3. What is the pip install command to install the package?
+  4. What is the minimum Python version required?
 
-  After creating the issue, return a JSON object with:
-  - "number": the issue number that was created
-  - "title": the title
-  - "url": the HTML URL of the issue
-
-  Return ONLY the JSON object, no other text.
-prompt_vars:
-  repo: "scalekit-inc/mcp-vs-cli-benchmark-data"
-  run_id: "PLACEHOLDER"
+  Return a JSON object with fields "license", "language", "install_command", and
+  "min_python_version". Return ONLY the JSON object, no other text.
 verification:
-  type: api_check
-  check_endpoint: "/repos/{repo}/issues/{number}"
+  type: contains
+  ground_truth:
+    - "MIT"
+    - "Python"
+    - "pip install anthropic"
+    - "3.9"
