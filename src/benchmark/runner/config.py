@@ -8,7 +8,7 @@ class ScheduleEntry(BaseModel):
     run_id: str
     task_id: str
     service: str
-    modality: str  # "cli" or "mcp"
+    modality: str  # "cli", "mcp", "gateway", or "cli_skilled"
     is_cold_start: bool
     run_number: int  # 1-based index within this modality
 
@@ -29,14 +29,25 @@ class BenchmarkConfig(BaseModel):
     cold_start_runs: int = 3
     seed: int | None = None
     task_ids: dict[str, list[str]] | None = None
+    skills: bool = False
+    modalities: list[str] = ["cli", "mcp"]
 
     def build_schedule(self) -> list[ScheduleEntry]:
-        """Build alternating CLI/MCP schedule with randomized task order."""
+        """Build schedule with entries for each configured modality.
+
+        Entries are grouped per task: one entry per modality, interleaved.
+        Task order within each round is randomized via the seed.
+        """
         rng = random.Random(self.seed)
         task_map = self.task_ids or DEFAULT_TASK_IDS
         entries: list[ScheduleEntry] = []
-        cli_count = 0
-        mcp_count = 0
+
+        # Resolve effective modalities: if skills is set, replace "cli" with "cli_skilled"
+        effective_modalities = [
+            "cli_skilled" if (m == "cli" and self.skills) else m
+            for m in self.modalities
+        ]
+        modality_counts: dict[str, int] = {m: 0 for m in effective_modalities}
 
         for run_num in range(1, self.runs_per_modality + 1):
             tasks_this_round: list[tuple[str, str]] = []
@@ -47,19 +58,13 @@ class BenchmarkConfig(BaseModel):
             rng.shuffle(tasks_this_round)
 
             for service, task_id in tasks_this_round:
-                cli_count += 1
-                entries.append(ScheduleEntry(
-                    run_id=str(uuid.uuid4()),
-                    task_id=task_id, service=service, modality="cli",
-                    is_cold_start=cli_count <= self.cold_start_runs,
-                    run_number=cli_count,
-                ))
-                mcp_count += 1
-                entries.append(ScheduleEntry(
-                    run_id=str(uuid.uuid4()),
-                    task_id=task_id, service=service, modality="mcp",
-                    is_cold_start=mcp_count <= self.cold_start_runs,
-                    run_number=mcp_count,
-                ))
+                for modality in effective_modalities:
+                    modality_counts[modality] += 1
+                    entries.append(ScheduleEntry(
+                        run_id=str(uuid.uuid4()),
+                        task_id=task_id, service=service, modality=modality,
+                        is_cold_start=modality_counts[modality] <= self.cold_start_runs,
+                        run_number=modality_counts[modality],
+                    ))
 
         return entries

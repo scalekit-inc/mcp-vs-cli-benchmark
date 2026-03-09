@@ -40,13 +40,23 @@ def main() -> None:
     run_parser.add_argument(
         "--modality",
         default=None,
-        choices=["cli", "mcp"],
-        help="Run only one modality. Omit to run both.",
+        choices=["cli", "mcp", "gateway", "cli_skilled"],
+        help="Run only one modality. Omit to run all configured.",
     )
     run_parser.add_argument(
         "--clean",
         action="store_true",
         help="Clear previous results before running.",
+    )
+    run_parser.add_argument(
+        "--skills",
+        action="store_true",
+        help="Inject service-specific skills into CLI agent prompt. Results recorded as 'cli_skilled'.",
+    )
+    run_parser.add_argument(
+        "--gateway",
+        action="store_true",
+        help="Include the gateway modality (MCP via Scalekit Gateway over streamable HTTP).",
     )
 
     # Analyze command
@@ -96,12 +106,19 @@ def _run(args: argparse.Namespace) -> None:
     else:
         services = args.service
 
+    # Determine which modalities to schedule
+    modalities = ["cli", "mcp"]
+    if args.gateway:
+        modalities.append("gateway")
+
     config = BenchmarkConfig(
         runs_per_modality=args.runs,
         model=args.model,
         services=services,
         seed=args.seed,
         task_ids=task_ids,
+        skills=args.skills,
+        modalities=modalities,
     )
 
     # Load tasks
@@ -132,6 +149,7 @@ def _run(args: argparse.Namespace) -> None:
     console.print(f"  Runs/mod:  {config.runs_per_modality}")
     console.print(f"  Task:      {args.task or 'all'}")
     console.print(f"  Modality:  {args.modality or 'both'}")
+    console.print(f"  Skills:    {'enabled' if args.skills else 'disabled'}")
     console.print(f"  Scheduled: {len(schedule)} runs")
     console.print(f"  Output:    {results_dir}")
     console.print()

@@ -11,7 +11,7 @@ from benchmark.agents.mcp_agent import McpAgent
 from benchmark.metrics.schemas import RunResult
 from benchmark.metrics.verifier import verify_output
 from benchmark.runner.config import BenchmarkConfig, ScheduleEntry
-from benchmark.runner.mcp_manager import mcp_session
+from benchmark.runner.mcp_manager import gateway_session, mcp_session
 from benchmark.tasks.registry import TaskRegistry
 from benchmark.tasks.schema import TaskDefinition
 
@@ -45,7 +45,11 @@ class BenchmarkHarness:
                 console.print(f"  [yellow]Skip: unknown task {entry.task_id}[/yellow]")
                 continue
 
-            modality_color = 'cyan' if entry.modality == 'cli' else 'magenta'
+            modality_colors = {
+                'cli': 'cyan', 'cli_skilled': 'cyan',
+                'mcp': 'magenta', 'gateway': 'green',
+            }
+            modality_color = modality_colors.get(entry.modality, 'white')
             label = (
                 f"[{modality_color}]{entry.modality.upper()}[/] "
                 f"{task_def.name} [dim]({entry.task_id})[/dim]"
@@ -80,20 +84,27 @@ class BenchmarkHarness:
 
     async def _run_single(self, entry: ScheduleEntry, task_def: TaskDefinition) -> RunResult:
         """Run a single benchmark entry via the appropriate agent."""
-        if entry.modality == "cli":
+        if entry.modality in ("cli", "cli_skilled"):
             return await self._run_cli(entry, task_def)
         elif entry.modality == "mcp":
             return await self._run_mcp(entry, task_def)
+        elif entry.modality == "gateway":
+            return await self._run_gateway(entry, task_def)
         else:
             raise ValueError(f"Unknown modality: {entry.modality}")
 
     async def _run_cli(self, entry: ScheduleEntry, task_def: TaskDefinition) -> RunResult:
         """Run a task via CLI agent."""
-        agent = CliAgent(model=self.config.model)
+        use_skills = entry.modality == "cli_skilled"
+        agent = CliAgent(
+            model=self.config.model,
+            service=entry.service,
+            skills=use_skills,
+        )
         return await agent.run(
             task=task_def,
             run_id=entry.run_id,
-            modality="cli",
+            modality=entry.modality,
             is_cold_start=entry.is_cold_start,
         )
 
@@ -108,6 +119,20 @@ class BenchmarkHarness:
                 task=task_def,
                 run_id=entry.run_id,
                 modality="mcp",
+                is_cold_start=entry.is_cold_start,
+            )
+
+    async def _run_gateway(self, entry: ScheduleEntry, task_def: TaskDefinition) -> RunResult:
+        """Run a task via MCP Gateway over streamable HTTP."""
+        async with gateway_session(entry.service) as session:
+            agent = await McpAgent.from_session(
+                model=self.config.model,
+                session=session,
+            )
+            return await agent.run(
+                task=task_def,
+                run_id=entry.run_id,
+                modality="gateway",
                 is_cold_start=entry.is_cold_start,
             )
 

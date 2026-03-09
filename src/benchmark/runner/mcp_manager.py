@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 
 
 # MCP server configurations per service
@@ -52,6 +53,34 @@ async def mcp_session(service: str) -> AsyncGenerator[ClientSession, None]:
 
     devnull = open(os.devnull, "w")
     async with stdio_client(server_params, errlog=devnull) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+@asynccontextmanager
+async def gateway_session(service: str) -> AsyncGenerator[ClientSession, None]:
+    """Connect to MCP Gateway for a service and yield an initialized session.
+
+    Uses streamable HTTP transport with Bearer token auth.  The Gateway URL
+    and API key are read from environment variables GATEWAY_MCP_URL and
+    GATEWAY_API_KEY respectively.
+
+    Usage:
+        async with gateway_session("github") as session:
+            tools = await session.list_tools()
+            result = await session.call_tool("get_file_contents", {...})
+    """
+    gateway_url = os.environ.get("GATEWAY_MCP_URL", "")
+    gateway_api_key = os.environ.get("GATEWAY_API_KEY", "")
+    if not gateway_url:
+        raise ValueError("GATEWAY_MCP_URL must be set in environment")
+    if not gateway_api_key:
+        raise ValueError("GATEWAY_API_KEY must be set in environment")
+
+    headers = {"Authorization": f"Bearer {gateway_api_key}"}
+
+    async with streamablehttp_client(url=gateway_url, headers=headers) as (read, write, _):
         async with ClientSession(read, write) as session:
             await session.initialize()
             yield session

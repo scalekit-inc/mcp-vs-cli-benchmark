@@ -1,7 +1,10 @@
 import asyncio
+from pathlib import Path
 from typing import Any
 
 from benchmark.agents.base import BaseAgent
+
+SKILLS_DIR = Path(__file__).parent / "prompts"
 
 BASH_TOOL = {
     "name": "bash",
@@ -25,8 +28,22 @@ BASH_TOOL = {
 class CliAgent(BaseAgent):
     """Agent that executes tasks via CLI tools (bash commands)."""
 
-    def __init__(self, model: str) -> None:
-        super().__init__(model=model, tools=[BASH_TOOL])
+    def __init__(self, model: str, service: str | None = None, skills: bool = False) -> None:
+        system_prompt = None
+        if skills and service:
+            system_prompt = self._build_skilled_prompt(service)
+        super().__init__(model=model, tools=[BASH_TOOL], system_prompt=system_prompt)
+
+    @staticmethod
+    def _build_skilled_prompt(service: str) -> str | None:
+        """Load base system prompt + service-specific skills file."""
+        skills_path = SKILLS_DIR / f"{service}_skills.md"
+        if not skills_path.exists():
+            return None
+        base_path = SKILLS_DIR / "system.md"
+        base = base_path.read_text() if base_path.exists() else ""
+        skills_content = skills_path.read_text()
+        return f"{base}\n\n{skills_content}"
 
     async def execute_tool(self, tool_name: str, tool_input: dict) -> str:
         if tool_name != "bash":
