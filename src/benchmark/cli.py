@@ -53,7 +53,15 @@ def main() -> None:
     if args.command == "run":
         _run(args)
     elif args.command == "analyze":
-        console.print("[yellow]Analysis not yet implemented[/yellow]")
+        from benchmark.analysis.report import generate_markdown_report
+
+        report = generate_markdown_report(Path(args.input))
+        console.print(report)
+        # Also save to file
+        report_path = Path(args.input).parent / "reports" / "report.md"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(report)
+        console.print(f"\n[green]Report saved to {report_path}[/green]")
     else:
         parser.print_help()
 
