@@ -43,6 +43,11 @@ def main() -> None:
         choices=["cli", "mcp"],
         help="Run only one modality. Omit to run both.",
     )
+    run_parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Clear previous results before running.",
+    )
 
     # Analyze command
     analyze_parser = subparsers.add_parser("analyze", help="Analyze results")
@@ -107,6 +112,14 @@ def _run(args: argparse.Namespace) -> None:
     registry = TaskRegistry(tasks_dir)
 
     results_dir = Path(args.output)
+
+    # Clear previous results if --clean
+    if args.clean and results_dir.exists():
+        removed = list(results_dir.glob("*.json"))
+        for f in removed:
+            f.unlink()
+        if removed:
+            console.print(f"[yellow]Cleaned {len(removed)} previous results from {results_dir}/[/yellow]\n")
 
     # Build schedule, optionally filter by modality
     schedule = config.build_schedule()
