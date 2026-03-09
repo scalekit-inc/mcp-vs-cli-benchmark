@@ -42,11 +42,12 @@ class BenchmarkConfig(BaseModel):
         task_map = self.task_ids or DEFAULT_TASK_IDS
         entries: list[ScheduleEntry] = []
 
-        # Resolve effective modalities: if skills is set, replace "cli" with "cli_skilled"
-        effective_modalities = [
-            "cli_skilled" if (m == "cli" and self.skills) else m
-            for m in self.modalities
-        ]
+        # Resolve effective modalities: if skills is set, add "cli_skilled" alongside "cli"
+        effective_modalities = list(self.modalities)
+        if self.skills and "cli_skilled" not in effective_modalities:
+            # Insert cli_skilled right after cli
+            idx = effective_modalities.index("cli") + 1 if "cli" in effective_modalities else 0
+            effective_modalities.insert(idx, "cli_skilled")
         modality_counts: dict[str, int] = {m: 0 for m in effective_modalities}
 
         for run_num in range(1, self.runs_per_modality + 1):
