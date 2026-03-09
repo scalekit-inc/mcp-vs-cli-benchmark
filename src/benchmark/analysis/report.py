@@ -1,10 +1,21 @@
 """Generate analysis reports from benchmark results."""
 
 from collections import defaultdict
+from itertools import combinations
 from pathlib import Path
+
+import numpy as np
 
 from benchmark.analysis.stats import ComparisonResult, compare_metric
 from benchmark.metrics.schemas import RunResult
+
+MODALITY_ORDER = ["cli", "cli_skilled", "mcp", "gateway"]
+MODALITY_LABELS = {
+    "cli": "CLI",
+    "cli_skilled": "CLI+Skills",
+    "mcp": "MCP",
+    "gateway": "Gateway",
+}
 
 
 def load_results(results_dir: Path) -> list[RunResult]:
@@ -27,39 +38,23 @@ def group_by_task(
     return dict(grouped)
 
 
-def analyze_task(
-    task_id: str, cli_runs: list[RunResult], mcp_runs: list[RunResult]
-) -> dict[str, ComparisonResult]:
-    """Analyze all metrics for a single task."""
-    comparisons: dict[str, ComparisonResult] = {}
+def _detect_modalities(results: list[RunResult]) -> list[str]:
+    """Return ordered list of modalities present in results."""
+    seen = {r.modality for r in results}
+    return [m for m in MODALITY_ORDER if m in seen]
 
-    # Token usage
-    cli_tokens = [float(r.total_tokens) for r in cli_runs]
-    mcp_tokens = [float(r.total_tokens) for r in mcp_runs]
-    if cli_tokens and mcp_tokens:
-        comparisons["total_tokens"] = compare_metric(
-            "total_tokens", cli_tokens, mcp_tokens
-        )
 
-    # Tool call count
-    cli_tc = [float(r.tool_call_count) for r in cli_runs]
-    mcp_tc = [float(r.tool_call_count) for r in mcp_runs]
-    if cli_tc and mcp_tc:
-        comparisons["tool_calls"] = compare_metric("tool_calls", cli_tc, mcp_tc)
-
-    # Wall clock time
-    cli_wc = [r.wall_clock_seconds for r in cli_runs]
-    mcp_wc = [r.wall_clock_seconds for r in mcp_runs]
-    if cli_wc and mcp_wc:
-        comparisons["wall_clock"] = compare_metric("wall_clock", cli_wc, mcp_wc)
-
-    # Completion rate
-    cli_comp = [1.0 if r.task_completed else 0.0 for r in cli_runs]
-    mcp_comp = [1.0 if r.task_completed else 0.0 for r in mcp_runs]
-    if cli_comp and mcp_comp:
-        comparisons["completion"] = compare_metric("completion", cli_comp, mcp_comp)
-
-    return comparisons
+def _extract_metric(runs: list[RunResult], metric: str) -> list[float]:
+    """Extract a metric as a list of floats from runs."""
+    if metric == "total_tokens":
+        return [float(r.total_tokens) for r in runs]
+    elif metric == "tool_calls":
+        return [float(r.tool_call_count) for r in runs]
+    elif metric == "wall_clock":
+        return [r.wall_clock_seconds for r in runs]
+    elif metric == "completion":
+        return [1.0 if r.task_completed else 0.0 for r in runs]
+    return []
 
 
 def generate_markdown_report(results_dir: Path) -> str:
@@ -69,61 +64,111 @@ def generate_markdown_report(results_dir: Path) -> str:
         return "# Benchmark Report\n\nNo results found.\n"
 
     grouped = group_by_task(results)
+    modalities = _detect_modalities(results)
 
     lines = [
         "# MCP vs CLI Benchmark Report\n",
         f"**Total runs:** {len(results)}",
         f"**Tasks:** {len(grouped)}",
+        f"**Modalities:** {', '.join(MODALITY_LABELS.get(m, m) for m in modalities)}",
         f"**Model:** {results[0].model if results else 'unknown'}",
         "",
     ]
 
-    all_comparisons: list[ComparisonResult] = []
-
+    # Per-task summary table
     for task_id in sorted(grouped.keys()):
-        cli_runs = grouped[task_id].get("cli", [])
-        mcp_runs = grouped[task_id].get("mcp", [])
-
-        # Use task_name from first available result, fall back to task_id
-        all_runs = cli_runs + mcp_runs
+        task_modalities = grouped[task_id]
+        all_runs = [r for runs in task_modalities.values() for r in runs]
         task_name = next((r.task_name for r in all_runs if r.task_name), task_id)
-        lines.append(f"## {task_name} (`{task_id}`)\n")
-        lines.append(f"CLI runs: {len(cli_runs)} | MCP runs: {len(mcp_runs)}\n")
 
-        if not cli_runs or not mcp_runs:
-            lines.append("*Skipped -- need both modalities to compare.*\n")
+        lines.append(f"## {task_name} (`{task_id}`)\n")
+
+        # Run counts
+        counts = " | ".join(
+            f"{MODALITY_LABELS.get(m, m)}: {len(task_modalities.get(m, []))}"
+            for m in modalities if m in task_modalities
+        )
+        lines.append(f"{counts}\n")
+
+        # Metrics overview table
+        present = [m for m in modalities if task_modalities.get(m)]
+        if len(present) < 2:
+            lines.append("*Need at least 2 modalities to compare.*\n")
             continue
 
-        comparisons = analyze_task(task_id, cli_runs, mcp_runs)
+        metrics = ["total_tokens", "tool_calls", "wall_clock", "completion"]
+        header_cols = ["Metric"] + [MODALITY_LABELS.get(m, m) for m in present]
+        lines.append("| " + " | ".join(header_cols) + " |")
+        lines.append("|" + "|".join(["--------"] * len(header_cols)) + "|")
 
-        lines.append(
-            "| Metric | CLI (median) | MCP (median) | Diff (mean) "
-            "| p-value | Cohen's d | Winner |"
-        )
-        lines.append(
-            "|--------|-------------|-------------|-------------|"
-            "---------|-----------|--------|"
-        )
-
-        for name, comp in comparisons.items():
-            p_str = f"{comp.p_value:.4f}" if comp.p_value is not None else "n/a"
-            lines.append(
-                f"| {comp.metric} | {comp.cli_median:.1f} | {comp.mcp_median:.1f} | "
-                f"{comp.mean_diff:+.1f} | {p_str} | {comp.cohens_d:.2f} | {comp.winner} |"
-            )
-            all_comparisons.append(comp)
+        for metric in metrics:
+            row = [metric]
+            for m in present:
+                vals = _extract_metric(task_modalities[m], metric)
+                if vals:
+                    med = float(np.median(vals))
+                    row.append(f"{med:.1f}")
+                else:
+                    row.append("n/a")
+            lines.append("| " + " | ".join(row) + " |")
 
         lines.append("")
 
-    # Summary
-    if all_comparisons:
-        cli_wins = sum(1 for c in all_comparisons if c.winner == "cli")
-        mcp_wins = sum(1 for c in all_comparisons if c.winner == "mcp")
-        ties = sum(1 for c in all_comparisons if c.winner == "tie")
+    # Pairwise comparisons
+    if len(modalities) >= 2:
+        lines.append("## Pairwise Comparisons\n")
 
-        lines.append("## Summary\n")
-        lines.append(f"- CLI wins: {cli_wins}")
-        lines.append(f"- MCP wins: {mcp_wins}")
-        lines.append(f"- Ties: {ties}")
+        all_comparisons: list[ComparisonResult] = []
+
+        for m1, m2 in combinations(modalities, 2):
+            label1 = MODALITY_LABELS.get(m1, m1)
+            label2 = MODALITY_LABELS.get(m2, m2)
+            lines.append(f"### {label1} vs {label2}\n")
+
+            has_data = False
+            for task_id in sorted(grouped.keys()):
+                runs1 = grouped[task_id].get(m1, [])
+                runs2 = grouped[task_id].get(m2, [])
+                if not runs1 or not runs2:
+                    continue
+
+                if not has_data:
+                    lines.append(
+                        f"| Task | Metric | {label1} (median) | {label2} (median) "
+                        f"| Diff (mean) | p-value | Cohen's d | Winner |"
+                    )
+                    lines.append(
+                        "|------|--------|" + "-------------|" * 2
+                        + "-------------|---------|-----------|--------|"
+                    )
+                    has_data = True
+
+                for metric in ["total_tokens", "tool_calls", "wall_clock"]:
+                    vals1 = _extract_metric(runs1, metric)
+                    vals2 = _extract_metric(runs2, metric)
+                    if vals1 and vals2:
+                        comp = compare_metric(metric, vals1, vals2)
+                        p_str = f"{comp.p_value:.4f}" if comp.p_value is not None else "n/a"
+                        lines.append(
+                            f"| {task_id} | {metric} | {comp.cli_median:.1f} "
+                            f"| {comp.mcp_median:.1f} | {comp.mean_diff:+.1f} "
+                            f"| {p_str} | {comp.cohens_d:.2f} | {comp.winner} |"
+                        )
+                        all_comparisons.append(comp)
+
+            if not has_data:
+                lines.append("*No overlapping task data.*\n")
+            lines.append("")
+
+        # Summary
+        if all_comparisons:
+            lines.append("## Summary\n")
+            # Count by first/second modality in pair
+            first_wins = sum(1 for c in all_comparisons if c.winner == "cli")
+            second_wins = sum(1 for c in all_comparisons if c.winner == "mcp")
+            ties = sum(1 for c in all_comparisons if c.winner == "tie")
+            lines.append(f"- Lower-value wins: {first_wins}")
+            lines.append(f"- Higher-value wins: {second_wins}")
+            lines.append(f"- Ties: {ties}")
 
     return "\n".join(lines) + "\n"
