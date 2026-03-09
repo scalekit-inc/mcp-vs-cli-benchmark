@@ -1,0 +1,14 @@
+id: github_01
+service: github
+name: Get repository language and license
+complexity: simple_read
+prompt: |
+  What is the primary programming language and license of the GitHub repository
+  "anthropics/anthropic-sdk-python"? Return a JSON object with two fields:
+  "language" (string, e.g. "Python") and "license" (string, e.g. "MIT License").
+  Return ONLY the JSON object, no other text.
+verification:
+  type: contains
+  ground_truth:
+    - "Python"
+    - "MIT"
