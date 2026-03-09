@@ -51,11 +51,15 @@ class JudgeVerdict(BaseModel):
 
 
 class TaskComparison(BaseModel):
-    """Aggregated comparison of CLI vs MCP for a single task."""
+    """Aggregated comparison across modalities for a single task."""
 
     task_id: str
     service: str
     cli_runs: list[RunResult]
     mcp_runs: list[RunResult]
+    gateway_runs: list[RunResult] = []
+    cli_skilled_runs: list[RunResult] = []
     cli_verdicts: list[JudgeVerdict] = []
     mcp_verdicts: list[JudgeVerdict] = []
+    gateway_verdicts: list[JudgeVerdict] = []
+    cli_skilled_verdicts: list[JudgeVerdict] = []

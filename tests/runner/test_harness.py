@@ -86,3 +86,43 @@ def test_schedule_total_count():
     )
     schedule = config.build_schedule()
     assert len(schedule) == 5 * 30 * 2  # 300
+
+
+def test_schedule_with_gateway_modality():
+    """When gateway is in modalities, entries are created for all three."""
+    config = BenchmarkConfig(
+        runs_per_modality=3,
+        services=["github"],
+        task_ids={"github": ["github_01"]},
+        modalities=["cli", "mcp", "gateway"],
+        seed=42,
+    )
+    schedule = config.build_schedule()
+    # 1 task x 3 runs x 3 modalities = 9 entries
+    assert len(schedule) == 9
+    modalities_seen = {e.modality for e in schedule}
+    assert modalities_seen == {"cli", "mcp", "gateway"}
+
+    # Each group of 3 consecutive entries should cover all three modalities for the same task
+    for i in range(0, len(schedule), 3):
+        group = schedule[i : i + 3]
+        assert {e.modality for e in group} == {"cli", "mcp", "gateway"}
+        assert len({e.task_id for e in group}) == 1
+
+
+def test_schedule_gateway_cold_starts():
+    """Gateway entries also get cold start marking."""
+    config = BenchmarkConfig(
+        runs_per_modality=5,
+        services=["github"],
+        task_ids={"github": ["github_01"]},
+        modalities=["cli", "mcp", "gateway"],
+        cold_start_runs=2,
+        seed=1,
+    )
+    schedule = config.build_schedule()
+    gateway_entries = [e for e in schedule if e.modality == "gateway"]
+    assert len(gateway_entries) == 5
+    assert gateway_entries[0].is_cold_start is True
+    assert gateway_entries[1].is_cold_start is True
+    assert gateway_entries[2].is_cold_start is False
