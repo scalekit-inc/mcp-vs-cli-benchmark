@@ -53,15 +53,28 @@ def main() -> None:
     if args.command == "run":
         _run(args)
     elif args.command == "analyze":
-        from benchmark.analysis.report import generate_markdown_report
+        from benchmark.analysis.charts import generate_summary_dashboard, save_charts
+        from benchmark.analysis.report import generate_markdown_report, load_results
 
-        report = generate_markdown_report(Path(args.input))
+        input_dir = Path(args.input)
+        report = generate_markdown_report(input_dir)
         console.print(report)
-        # Also save to file
-        report_path = Path(args.input).parent / "reports" / "report.md"
+
+        # Save markdown report
+        report_path = input_dir.parent / "reports" / "report.md"
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(report)
         console.print(f"\n[green]Report saved to {report_path}[/green]")
+
+        # Generate charts
+        results = load_results(input_dir)
+        if results:
+            charts_dir = input_dir.parent / "charts"
+            paths = save_charts(results, charts_dir)
+            for p in paths:
+                console.print(f"  [dim]Chart: {p}[/dim]")
+            dashboard = generate_summary_dashboard(results, charts_dir)
+            console.print(f"[green]Dashboard saved to {dashboard}[/green]")
     else:
         parser.print_help()
 
