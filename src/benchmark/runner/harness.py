@@ -45,10 +45,10 @@ class BenchmarkHarness:
                 console.print(f"  [yellow]Skip: unknown task {entry.task_id}[/yellow]")
                 continue
 
+            modality_color = 'cyan' if entry.modality == 'cli' else 'magenta'
             label = (
-                f"[{'cyan' if entry.modality == 'cli' else 'magenta'}]"
-                f"{entry.modality.upper()}[/] {entry.task_id} "
-                f"(#{entry.run_number}, {'cold' if entry.is_cold_start else 'warm'})"
+                f"[{modality_color}]{entry.modality.upper()}[/] "
+                f"{task_def.name} [dim]({entry.task_id})[/dim]"
             )
 
             try:

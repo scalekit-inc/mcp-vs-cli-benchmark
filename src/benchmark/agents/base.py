@@ -70,7 +70,7 @@ class BaseAgent:
         is_cold_start: bool = False,
     ) -> RunResult:
         """Run a single benchmark: send task to LLM, handle tool calls, collect metrics."""
-        collector = MetricsCollector(run_id=run_id, task_id=task.id, modality=modality)
+        collector = MetricsCollector(run_id=run_id, task_id=task.id, task_name=task.name, modality=modality)
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": self.system_prompt},
             *self.build_messages(task),

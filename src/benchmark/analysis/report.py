@@ -84,7 +84,10 @@ def generate_markdown_report(results_dir: Path) -> str:
         cli_runs = grouped[task_id].get("cli", [])
         mcp_runs = grouped[task_id].get("mcp", [])
 
-        lines.append(f"## {task_id}\n")
+        # Use task_name from first available result, fall back to task_id
+        all_runs = cli_runs + mcp_runs
+        task_name = next((r.task_name for r in all_runs if r.task_name), task_id)
+        lines.append(f"## {task_name} (`{task_id}`)\n")
         lines.append(f"CLI runs: {len(cli_runs)} | MCP runs: {len(mcp_runs)}\n")
 
         if not cli_runs or not mcp_runs:

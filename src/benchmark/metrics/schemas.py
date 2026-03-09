@@ -22,6 +22,7 @@ class RunResult(BaseModel):
 
     run_id: str
     task_id: str
+    task_name: str = ""
     modality: Literal["cli", "mcp"]
     model: str
     timestamp: datetime

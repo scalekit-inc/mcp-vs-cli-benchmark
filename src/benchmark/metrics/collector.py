@@ -9,9 +9,10 @@ from benchmark.metrics.schemas import RunResult, ToolCallMetric
 class MetricsCollector:
     """Collects metrics during a single benchmark run."""
 
-    def __init__(self, run_id: str, task_id: str, modality: str) -> None:
+    def __init__(self, run_id: str, task_id: str, task_name: str, modality: str) -> None:
         self.run_id = run_id
         self.task_id = task_id
+        self.task_name = task_name
         self.modality = modality
         self.tool_calls: list[ToolCallMetric] = []
         self.total_input_tokens: int = 0
@@ -62,6 +63,7 @@ class MetricsCollector:
         return RunResult(
             run_id=self.run_id,
             task_id=self.task_id,
+            task_name=self.task_name,
             modality=self.modality,
             model=model,
             timestamp=datetime.now(timezone.utc),
