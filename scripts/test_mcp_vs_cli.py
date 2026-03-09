@@ -50,19 +50,19 @@ def make_github_task(repo: str) -> TaskDefinition:
     return TaskDefinition(
         id="github_mcp_vs_cli_01",
         service="github",
-        name="List repository topics and description",
+        name="Get repository language and license",
         complexity="simple_read",
         prompt=(
-            f'Get the description and topics (tags) of the GitHub repository "{repo}". '
+            f'What is the primary programming language and license of the GitHub repository "{repo}"? '
             "Return a JSON object with two fields: "
-            '"description" (string) and "topics" (array of strings). '
+            '"language" (string, e.g. "Python") and "license" (string, e.g. "MIT License"). '
             "Return ONLY the JSON object, no other text."
         ),
         prompt_vars={},
         verification=VerificationConfig(
             type="contains",
-            # We just verify it returned something reasonable
-            ground_truth=['"description"', '"topics"'],
+            # anthropics/anthropic-sdk-python is Python with MIT license
+            ground_truth=["Python", "MIT"],
         ),
     )
 
@@ -204,7 +204,7 @@ async def main() -> None:
     console.print(Panel(
         f"[bold]MCP vs CLI Comparison[/bold]\n"
         f"Model: {args.model}\n"
-        f"Task: Get repo description and topics for {args.repo}\n"
+        f"Task: Get repo language and license for {args.repo}\n"
         f"This will make ~2-6 real LLM API calls.",
         title="MCP vs CLI Benchmark",
     ))
