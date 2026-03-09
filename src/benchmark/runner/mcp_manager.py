@@ -50,7 +50,8 @@ async def mcp_session(service: str) -> AsyncGenerator[ClientSession, None]:
         env=env,
     )
 
-    async with stdio_client(server_params) as (read, write):
+    devnull = open(os.devnull, "w")
+    async with stdio_client(server_params, errlog=devnull) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             yield session

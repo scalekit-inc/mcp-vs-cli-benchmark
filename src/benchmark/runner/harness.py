@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from benchmark.agents.cli_agent import CliAgent
 from benchmark.agents.mcp_agent import McpAgent
@@ -39,50 +39,38 @@ class BenchmarkHarness:
         completed = 0
         failed = 0
 
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            BarColumn(),
-            MofNCompleteColumn(),
-            console=console,
-        ) as progress:
-            task_bar = progress.add_task("Running benchmark...", total=total)
+        for i, entry in enumerate(schedule, 1):
+            task_def = self.registry.get_task(entry.task_id)
+            if task_def is None:
+                console.print(f"  [yellow]Skip: unknown task {entry.task_id}[/yellow]")
+                continue
 
-            for entry in schedule:
-                task_def = self.registry.get_task(entry.task_id)
-                if task_def is None:
-                    console.print(f"  [yellow]Skip: unknown task {entry.task_id}[/yellow]")
-                    progress.advance(task_bar)
-                    continue
+            label = (
+                f"[{'cyan' if entry.modality == 'cli' else 'magenta'}]"
+                f"{entry.modality.upper()}[/] {entry.task_id} "
+                f"(#{entry.run_number}, {'cold' if entry.is_cold_start else 'warm'})"
+            )
 
-                label = (
-                    f"[{'cyan' if entry.modality == 'cli' else 'magenta'}]"
-                    f"{entry.modality.upper()}[/] {entry.task_id} "
-                    f"(#{entry.run_number}, {'cold' if entry.is_cold_start else 'warm'})"
-                )
-                progress.update(task_bar, description=label)
-
-                try:
+            try:
+                with console.status(f"  {label} [{i}/{total}]"):
                     result = await self._run_single(entry, task_def)
-                    results.append(result)
-                    self._save_result(result)
+                results.append(result)
+                self._save_result(result)
 
-                    # Quick verification
-                    v = verify_output(result.agent_output, task_def.verification)
-                    status = "[green]PASS[/green]" if v.passed else f"[red]FAIL ({v.score:.0%})[/red]"
-                    console.print(
-                        f"  {label} → {result.total_tokens} tok, "
-                        f"{result.tool_call_count} calls, "
-                        f"{result.wall_clock_seconds:.1f}s, "
-                        f"{status}"
-                    )
-                    completed += 1
+                # Quick verification
+                v = verify_output(result.agent_output, task_def.verification)
+                status = "[green]PASS[/green]" if v.passed else f"[red]FAIL ({v.score:.0%})[/red]"
+                console.print(
+                    f"  {label} → {result.total_tokens} tok, "
+                    f"{result.tool_call_count} calls, "
+                    f"{result.wall_clock_seconds:.1f}s, "
+                    f"{status}"
+                )
+                completed += 1
 
-                except Exception as e:
-                    console.print(f"  {label} → [red]ERROR: {e}[/red]")
-                    failed += 1
-
-                progress.advance(task_bar)
+            except Exception as e:
+                console.print(f"  {label} → [red]ERROR: {e}[/red]")
+                failed += 1
 
         console.print(
             f"\n[bold]Done:[/bold] {completed} completed, {failed} failed, "
