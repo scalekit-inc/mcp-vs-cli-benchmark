@@ -1,0 +1,30 @@
+{
+  "run_id": "a00b2724-1bc9-40ff-a7e0-6862629cf890",
+  "task_id": "github_02",
+  "task_name": "Get PR details including review status",
+  "modality": "cli_skilled",
+  "model": "claude-sonnet-4-20250514",
+  "timestamp": "2026-03-10T07:39:58.597097Z",
+  "input_tokens": 2679,
+  "output_tokens": 137,
+  "total_tokens": 2816,
+  "tool_calls": [
+    {
+      "tool_name": "bash",
+      "tool_input": {
+        "command": "gh pr view 1158 -R anthropics/anthropic-sdk-python --json number,title,state,author,reviews"
+      },
+      "tool_output": "{\"author\":{\"id\":\"U_kgDOBX_97A\",\"is_bot\":false,\"login\":\"karpetrosyan\",\"name\":\"Kar Petrosyan\"},\"number\":1158,\"reviews\":[{\"id\":\"PRR_kwDOIy2NGM7fQ98G\",\"author\":{\"login\":\"RobertCraigie\"},\"authorAssociation\":\"COLLABORATOR\",\"body\":\"\",\"submittedAt\":\"2026-02-03T14:55:13Z\",\"includesCreatedEdit\":false,\"reactionGroups\":[],\"state\":\"APPROVED\",\"commit\":{\"oid\":\"e8ddc6e64b973c063d1149f441f662c72a3521d5\"}}],\"state\":\"MERGED\",\"title\":\"fix(structured outputs): send structured output beta header when format is omitted\"}",
+      "duration_ms": 647.4112910218537,
+      "success": true,
+      "error": null
+    }
+  ],
+  "tool_call_count": 1,
+  "wall_clock_seconds": 6.959030291007366,
+  "task_completed": true,
+  "completion_score": 1.0,
+  "agent_output": "{\"number\": 1158, \"title\": \"fix(structured outputs): send structured output beta header when format is omitted\", \"state\": \"merged\", \"author\": \"karpetrosyan\", \"reviewer\": \"RobertCraigie\"}",
+  "error": null,
+  "is_cold_start": false
+}

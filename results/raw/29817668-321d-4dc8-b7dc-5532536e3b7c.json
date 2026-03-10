@@ -1,0 +1,30 @@
+{
+  "run_id": "29817668-321d-4dc8-b7dc-5532536e3b7c",
+  "task_id": "github_01",
+  "task_name": "Get repository language and license",
+  "modality": "cli",
+  "model": "claude-sonnet-4-20250514",
+  "timestamp": "2026-03-10T07:19:36.397748Z",
+  "input_tokens": 1278,
+  "output_tokens": 87,
+  "total_tokens": 1365,
+  "tool_calls": [
+    {
+      "tool_name": "bash",
+      "tool_input": {
+        "command": "gh repo view anthropics/anthropic-sdk-python --json primaryLanguage,licenseInfo"
+      },
+      "tool_output": "{\"licenseInfo\":{\"key\":\"mit\",\"name\":\"MIT License\",\"nickname\":\"\"},\"primaryLanguage\":{\"name\":\"Python\"}}",
+      "duration_ms": 563.884999952279,
+      "success": true,
+      "error": null
+    }
+  ],
+  "tool_call_count": 1,
+  "wall_clock_seconds": 5.792779416020494,
+  "task_completed": true,
+  "completion_score": 1.0,
+  "agent_output": "{\"language\": \"Python\", \"license\": \"MIT License\"}",
+  "error": null,
+  "is_cold_start": false
+}

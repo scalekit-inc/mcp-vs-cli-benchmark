@@ -1,0 +1,19 @@
+{
+  "run_id": "aa425ba5-3c68-4e81-9866-0dfe36f55fcc",
+  "task_id": "github_02",
+  "task_name": "Get PR details including review status",
+  "modality": "mcp",
+  "model": "anthropic/claude-sonnet-4-20250514",
+  "timestamp": "2026-03-09T23:06:54.827847Z",
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "total_tokens": 0,
+  "tool_calls": [],
+  "tool_call_count": 0,
+  "wall_clock_seconds": 0.53556937497342,
+  "task_completed": false,
+  "completion_score": 0.0,
+  "agent_output": "",
+  "error": "litellm.BadRequestError: AnthropicException - {\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":\"You have reached your specified API usage limits. You will regain access on 2026-04-01 at 00:00 UTC.\"},\"request_id\":\"req_011CYtM1cNqsPnEipyKuYtEP\"}",
+  "is_cold_start": true
+}

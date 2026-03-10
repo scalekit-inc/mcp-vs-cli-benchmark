@@ -1,0 +1,46 @@
+{
+  "run_id": "43c26ef9-efcd-4d8d-94d3-d489cbde8b90",
+  "task_id": "github_02",
+  "task_name": "Get PR details including review status",
+  "modality": "mcp",
+  "model": "claude-sonnet-4-20250514",
+  "timestamp": "2026-03-10T07:26:40.583446Z",
+  "input_tokens": 31973,
+  "output_tokens": 306,
+  "total_tokens": 32279,
+  "tool_calls": [
+    {
+      "tool_name": "pull_request_read",
+      "tool_input": {
+        "method": "get",
+        "owner": "anthropics",
+        "repo": "anthropic-sdk-python",
+        "pullNumber": 1158
+      },
+      "tool_output": "{\"number\":1158,\"title\":\"fix(structured outputs): send structured output beta header when format is omitted\",\"body\":\"This reverts commit 062077e50d182719637403576f59761999b3b2f5.\",\"state\":\"closed\",\"draft\":false,\"merged\":true,\"mergeable_state\":\"unknown\",\"html_url\":\"https://github.com/anthropics/anthropic-sdk-python/pull/1158\",\"user\":{\"login\":\"karpetrosyan\",\"id\":92274156,\"profile_url\":\"https://github.com/karpetrosyan\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/92274156?v=4\"},\"merged_by\":\"RobertCraigie\",\"head\":{\"ref\":\"fix-tool-runner-empty-betas\",\"sha\":\"e8ddc6e64b973c063d1149f441f662c72a3521d5\",\"repo\":{\"full_name\":\"karpetrosyan/anthropic-sdk-python\"}},\"base\":{\"ref\":\"next\",\"sha\":\"9c485f6966e10ae0ea9eabb3a921d2ea8145a25b\",\"repo\":{\"full_name\":\"anthropics/anthropic-sdk-python\"}},\"additions\":3,\"deletions\":3,\"changed_files\":2,\"commits\":3,\"comments\":7,\"created_at\":\"2026-02-03T14:16:19Z\",\"updated_at\":\"2026-02-03T14:55:52Z\",\"closed_at\":\"2026-02-03T14:55:32Z\",\"merged_at\":\"2026-02-03T14:55:32Z\"}",
+      "duration_ms": 966.5632080286741,
+      "success": true,
+      "error": null
+    },
+    {
+      "tool_name": "pull_request_read",
+      "tool_input": {
+        "method": "get_reviews",
+        "owner": "anthropics",
+        "repo": "anthropic-sdk-python",
+        "pullNumber": 1158
+      },
+      "tool_output": "[{\"id\":3745767174,\"state\":\"APPROVED\",\"html_url\":\"https://github.com/anthropics/anthropic-sdk-python/pull/1158#pullrequestreview-3745767174\",\"user\":{\"login\":\"RobertCraigie\",\"id\":23125036,\"profile_url\":\"https://github.com/RobertCraigie\",\"avatar_url\":\"https://avatars.githubusercontent.com/u/23125036?u=2652b638d8fde9fb96e59932ca59fc5be8f78cbd\\u0026v=4\"},\"commit_id\":\"e8ddc6e64b973c063d1149f441f662c72a3521d5\",\"submitted_at\":\"2026-02-03T14:55:13Z\",\"author_association\":\"COLLABORATOR\"}]",
+      "duration_ms": 784.9484999896958,
+      "success": true,
+      "error": null
+    }
+  ],
+  "tool_call_count": 2,
+  "wall_clock_seconds": 13.854777708009351,
+  "task_completed": true,
+  "completion_score": 1.0,
+  "agent_output": "```json\n{\n  \"number\": 1158,\n  \"title\": \"fix(structured outputs): send structured output beta header when format is omitted\",\n  \"state\": \"merged\",\n  \"author\": \"karpetrosyan\",\n  \"reviewer\": \"RobertCraigie\"\n}\n```",
+  "error": null,
+  "is_cold_start": false
+}
