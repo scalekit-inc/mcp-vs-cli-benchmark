@@ -68,30 +68,34 @@ def main() -> None:
     if args.command == "run":
         _run(args)
     elif args.command == "analyze":
-        from benchmark.analysis.charts import generate_summary_dashboard, save_charts
-        from benchmark.analysis.report import generate_markdown_report, load_results
-
-        input_dir = Path(args.input)
-        report = generate_markdown_report(input_dir)
-        console.print(report)
-
-        # Save markdown report
-        report_path = input_dir.parent / "reports" / "report.md"
-        report_path.parent.mkdir(parents=True, exist_ok=True)
-        report_path.write_text(report)
-        console.print(f"\n[green]Report saved to {report_path}[/green]")
-
-        # Generate charts
-        results = load_results(input_dir)
-        if results:
-            charts_dir = input_dir.parent / "charts"
-            paths = save_charts(results, charts_dir)
-            for p in paths:
-                console.print(f"  [dim]Chart: {p}[/dim]")
-            dashboard = generate_summary_dashboard(results, charts_dir)
-            console.print(f"[green]Dashboard saved to {dashboard}[/green]")
+        _analyze(Path(args.input))
     else:
         parser.print_help()
+
+
+def _analyze(input_dir: Path) -> None:
+    """Run analysis: generate report, charts, and dashboard."""
+    from benchmark.analysis.charts import generate_summary_dashboard, save_charts
+    from benchmark.analysis.report import generate_markdown_report, load_results
+
+    report = generate_markdown_report(input_dir)
+    console.print(report)
+
+    # Save markdown report
+    report_path = input_dir.parent / "reports" / "report.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report)
+    console.print(f"\n[green]Report saved to {report_path}[/green]")
+
+    # Generate charts
+    results = load_results(input_dir)
+    if results:
+        charts_dir = input_dir.parent / "charts"
+        paths = save_charts(results, charts_dir)
+        for p in paths:
+            console.print(f"  [dim]Chart: {p}[/dim]")
+        dashboard = generate_summary_dashboard(results, charts_dir)
+        console.print(f"[green]Dashboard saved to {dashboard}[/green]")
 
 
 def _run(args: argparse.Namespace) -> None:
@@ -107,9 +111,13 @@ def _run(args: argparse.Namespace) -> None:
         services = args.service
 
     # Determine which modalities to schedule
-    modalities = ["cli", "mcp"]
-    if args.gateway:
-        modalities.append("gateway")
+    if args.modality:
+        # Single modality mode: only schedule the requested one
+        modalities = [args.modality]
+    else:
+        modalities = ["cli", "mcp"]
+        if args.gateway:
+            modalities.append("gateway")
 
     config = BenchmarkConfig(
         runs_per_modality=args.runs,
@@ -138,10 +146,8 @@ def _run(args: argparse.Namespace) -> None:
         if removed:
             console.print(f"[yellow]Cleaned {len(removed)} previous results from {results_dir}/[/yellow]\n")
 
-    # Build schedule, optionally filter by modality
+    # Build schedule
     schedule = config.build_schedule()
-    if args.modality:
-        schedule = [e for e in schedule if e.modality == args.modality]
 
     console.print("[bold]MCP vs CLI Benchmark[/bold]")
     console.print(f"  Model:     {config.model}")
@@ -158,6 +164,9 @@ def _run(args: argparse.Namespace) -> None:
     results = asyncio.run(harness.run_schedule(schedule))
 
     console.print(f"\n[green]{len(results)} results saved to {results_dir}/[/green]")
+
+    # Auto-analyze after run
+    _analyze(results_dir)
 
 
 if __name__ == "__main__":

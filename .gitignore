@@ -9,3 +9,6 @@ results/raw/
 .pytest_cache/
 .ruff_cache/
 .python-version
+content/
+anthropic-sdk-python/
+litellm_config.yaml

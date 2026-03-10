@@ -147,7 +147,7 @@ def generate_markdown_report(results_dir: Path) -> str:
                     vals1 = _extract_metric(runs1, metric)
                     vals2 = _extract_metric(runs2, metric)
                     if vals1 and vals2:
-                        comp = compare_metric(metric, vals1, vals2)
+                        comp = compare_metric(metric, vals1, vals2, label_a=label1, label_b=label2)
                         p_str = f"{comp.p_value:.4f}" if comp.p_value is not None else "n/a"
                         lines.append(
                             f"| {task_id} | {metric} | {comp.cli_median:.1f} "
@@ -163,12 +163,17 @@ def generate_markdown_report(results_dir: Path) -> str:
         # Summary
         if all_comparisons:
             lines.append("## Summary\n")
-            # Count by first/second modality in pair
-            first_wins = sum(1 for c in all_comparisons if c.winner == "cli")
-            second_wins = sum(1 for c in all_comparisons if c.winner == "mcp")
-            ties = sum(1 for c in all_comparisons if c.winner == "tie")
-            lines.append(f"- Lower-value wins: {first_wins}")
-            lines.append(f"- Higher-value wins: {second_wins}")
+            win_counts: dict[str, int] = {}
+            ties = 0
+            for c in all_comparisons:
+                if c.winner == "tie":
+                    ties += 1
+                else:
+                    win_counts[c.winner] = win_counts.get(c.winner, 0) + 1
+            for label in [MODALITY_LABELS.get(m, m) for m in modalities]:
+                count = win_counts.get(label, 0)
+                if count > 0:
+                    lines.append(f"- **{label}** wins: {count}")
             lines.append(f"- Ties: {ties}")
 
     return "\n".join(lines) + "\n"

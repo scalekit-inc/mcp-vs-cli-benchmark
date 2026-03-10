@@ -63,17 +63,17 @@ def cohens_d(group1: list[float], group2: list[float]) -> float:
 def wilcoxon_test(
     group1: list[float], group2: list[float]
 ) -> tuple[float | None, float | None]:
-    """Paired Wilcoxon signed-rank test.
+    """Mann-Whitney U test for independent samples.
 
     Returns (statistic, p_value) or (None, None) if not enough data.
+    Requires at least 3 observations per group.
     """
-    if len(group1) != len(group2) or len(group1) < 6:
+    if len(group1) < 3 or len(group2) < 3:
         return None, None
-    diffs = [a - b for a, b in zip(group1, group2)]
-    if all(d == 0 for d in diffs):
+    if all(v == group1[0] for v in group1) and all(v == group2[0] for v in group2) and group1[0] == group2[0]:
         return None, None
     try:
-        stat, p = sp_stats.wilcoxon(group1, group2, alternative="two-sided")
+        stat, p = sp_stats.mannwhitneyu(group1, group2, alternative="two-sided")
         return float(stat), float(p)
     except Exception:
         return None, None
@@ -105,8 +105,10 @@ def compare_metric(
     metric_name: str,
     cli_values: list[float],
     mcp_values: list[float],
+    label_a: str = "cli",
+    label_b: str = "mcp",
 ) -> ComparisonResult:
-    """Full comparison of CLI vs MCP for a single metric."""
+    """Full comparison of two groups for a single metric."""
     cli_stats = descriptive_stats(cli_values)
     mcp_stats = descriptive_stats(mcp_values)
 
@@ -117,7 +119,7 @@ def compare_metric(
 
     # Determine winner (lower is better for tokens, latency, tool calls)
     if p_val is not None and p_val < 0.05:
-        winner = "cli" if mean_diff < 0 else "mcp"
+        winner = label_a if mean_diff < 0 else label_b
     else:
         winner = "tie"
 
